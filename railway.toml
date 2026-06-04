@@ -1,8 +1,8 @@
 # Railway deployment configuration — MF FAQ Assistant (FastAPI backend)
 #
-# Bootstrap note: the releaseCommand seeds the ChromaDB index before the
-# server starts.  On first deploy this takes ~80s (BGE model download).
-# Subsequent deploys use cached model weights and take ~19s.
+# Bootstrap: startCommand runs ingestion before uvicorn so the ChromaDB index
+# is built inside the runtime container.  First deploy ~80s (BGE download);
+# subsequent deploys ~19s (BGE cached).  healthcheckTimeout=300 accommodates this.
 #
 # Two services are required for a full deployment:
 #   1. api   — this file; FastAPI backend on PORT assigned by Railway
@@ -13,10 +13,12 @@
 builder = "nixpacks"
 
 [deploy]
-# Seed the ChromaDB index before the server accepts traffic.
-# GROQ_API_KEY must be set as a Railway environment variable.
-releaseCommand = "python -m ingestion.run"
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+# Bootstrap: ingestion runs in the same runtime container as the API so the
+# ChromaDB index written to data/index/ is immediately readable by the server.
+# (Railway's releaseCommand runs in a separate ephemeral container whose
+# filesystem is discarded before the runtime container starts — see
+# docs/deployment-plan.md for a full explanation.)
+startCommand = "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

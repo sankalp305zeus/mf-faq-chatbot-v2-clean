@@ -218,15 +218,16 @@ The application deploys to Railway as two services (API + UI). See [`docs/deploy
 
 | Service | Start command | Key env var |
 |---------|--------------|-------------|
-| API | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` | `GROQ_API_KEY` |
+| API | `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT` | `GROQ_API_KEY` |
 | UI | `streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0` | `API_BASE=<api-url>` |
 
-The `railway.toml` `releaseCommand` runs `python -m ingestion.run` on every deploy, seeding the ChromaDB index before the server starts. Daily re-ingestion is fully automated:
+On every deploy, `startCommand` runs ingestion first — building `data/index/` inside the runtime container — then starts uvicorn. This ensures the ChromaDB collection exists in the same filesystem the API reads from. (Railway's `releaseCommand` runs in a separate ephemeral container whose filesystem is discarded before the runtime container starts; see [`docs/deployment-plan.md`](docs/deployment-plan.md) for a full explanation.) Daily re-ingestion is fully automated:
 
 ```
 GitHub Actions cron (04:30 UTC = 10:00 AM IST)
   → ingestion succeeds → POST RAILWAY_DEPLOY_HOOK_URL
-  → Railway releaseCommand rebuilds index → new deployment goes live
+  → Railway startCommand: python -m ingestion.run && uvicorn …
+  → fresh index built in runtime container → new deployment goes live
 ```
 
 Two repository secrets are required: `GROQ_API_KEY` and `RAILWAY_DEPLOY_HOOK_URL` (Railway dashboard → API service → Settings → Deploy Hooks). See [`docs/deployment-plan.md`](docs/deployment-plan.md) for full setup instructions.

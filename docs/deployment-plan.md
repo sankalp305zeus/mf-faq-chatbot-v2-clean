@@ -49,19 +49,44 @@ Both are deployed as separate Railway services. The Streamlit service points to 
 
 ---
 
-## ChromaDB bootstrap — cold-start strategy
+## ChromaDB bootstrap — runtime bootstrap strategy
 
-`data/index/` is gitignored. A fresh Railway deploy has no index. The
-`releaseCommand` in `railway.toml` runs `python -m ingestion.run` before
-the server starts, seeding the index automatically.
+`data/index/` is gitignored. The built Docker image contains an empty
+`data/index/` directory. The `startCommand` in `railway.toml` runs
+`python -m ingestion.run` **before** uvicorn starts, building the index
+inside the same runtime container that serves API requests.
+
+```
+startCommand = "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+```
+
+**Why not `releaseCommand`?**
+
+Railway's build pipeline has three distinct phases, each running in a
+separate, isolated container:
+
+1. **Build** — Nixpacks produces a Docker image from the repo. `data/index/`
+   is gitignored, so the image contains an empty directory.
+2. **Release** — `releaseCommand` runs in a fresh container instantiated from
+   that image. Any filesystem writes (including ChromaDB files) exist only in
+   this container's ephemeral local storage. When the release container exits,
+   its filesystem is discarded. Railway provides no mechanism to carry local
+   filesystem state from the release container into the runtime container.
+3. **Runtime** — a new container is started from the same image. `data/index/`
+   is empty again. `client.get_collection("mf_faq")` raises
+   `ValueError: Collection mf_faq does not exist`.
+
+Moving ingestion into `startCommand` ensures the index is written to the
+runtime container's own filesystem — the same filesystem the API reads from.
 
 **Timeline:**
-- First deploy: ~80 s (BGE model downloads from HuggingFace Hub, then ingestion runs)
-- Subsequent deploys: ~19 s (model cached in Railway's build layer)
+- First deploy: ~80–100 s (BGE model downloads from HuggingFace Hub, then
+  ingestion runs). Railway's `healthcheckTimeout = 300` accommodates this.
+- Subsequent deploys: ~19 s (BGE model cached in Railway's layer cache).
 
-**If the release command fails**, Railway will not promote the new deploy
-and the previous deployment continues serving traffic. Check the release
-logs in the Railway dashboard.
+**If ingestion fails**, `python -m ingestion.run` exits non-zero, the `&&`
+short-circuits, uvicorn never starts, Railway marks the deployment as failed,
+and the previous deployment continues serving traffic.
 
 **Manual bootstrap** (local or Railway shell):
 ```bash
@@ -78,9 +103,8 @@ python -m ingestion.run --skip-fetch  # re-index from cached HTML
 1. Create a new Railway project → **Deploy from GitHub repo**.
 2. Select this repository.
 3. Railway auto-detects `railway.toml` and uses:
-   - **Release command:** `python -m ingestion.run`
-   - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Health check path:** `/health`
+   - **Start command:** `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - **Health check path:** `/health` (300 s timeout — accommodates ingestion runtime)
 4. Add environment variables (see table above). At minimum: `GROQ_API_KEY`.
 5. Deploy. Watch the release logs — ingestion should complete before the
    server starts.
@@ -108,9 +132,11 @@ GitHub Actions is the scheduler. The complete end-to-end refresh path is:
 GitHub Actions cron (04:30 UTC = 10:00 AM IST)
   → python -m ingestion.run        (verify ingestion succeeds; produce audit artifact)
   → POST RAILWAY_DEPLOY_HOOK_URL   (only fires if ingestion succeeded)
-      → Railway runs releaseCommand: python -m ingestion.run
-      → Railway starts new deployment with freshly built index
-      → live service serves updated data
+      → Railway triggers new deployment
+      → startCommand: python -m ingestion.run && uvicorn app.main:app …
+          ingestion fetches fresh data → builds data/index/ in runtime container
+          uvicorn starts → /health → 200 → deployment promoted
+      → live service serves refreshed index
 ```
 
 ### Required secrets
@@ -128,9 +154,13 @@ Settings → Secrets and variables → Actions → New repository secret.
 When GitHub Actions POSTs to the deploy hook URL, Railway:
 1. Pulls the latest commit from the connected GitHub branch.
 2. Builds the service (Nixpacks).
-3. Runs `releaseCommand = "python -m ingestion.run"` — fetches fresh data from Groww and rebuilds the ChromaDB index.
-4. Promotes the new deployment; traffic shifts to it once `/health` returns 200.
-5. If the release command fails, Railway does not promote the new deployment and the previous version continues serving.
+3. Starts the runtime container with `startCommand`:
+   `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   — ingestion fetches fresh data from Groww and rebuilds `data/index/` inside
+   the runtime container, then uvicorn starts.
+4. Promotes the new deployment once `/health` returns 200.
+5. If ingestion fails, `&&` short-circuits, uvicorn never starts, Railway does
+   not promote, and the previous deployment continues serving.
 
 ### Failure behaviour
 
