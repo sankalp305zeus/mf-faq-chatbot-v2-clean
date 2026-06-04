@@ -18,7 +18,7 @@ builder = "nixpacks"
 # (Railway's releaseCommand runs in a separate ephemeral container whose
 # filesystem is discarded before the runtime container starts — see
 # docs/deployment-plan.md for a full explanation.)
-startCommand = "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
