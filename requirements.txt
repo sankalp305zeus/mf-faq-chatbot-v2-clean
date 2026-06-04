@@ -1,0 +1,19 @@
+# --- Phase 0–1: ingestion (fetch + parse + section extraction) ---
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.3.0
+PyYAML==6.0.2
+
+# --- Phase 2: embedding + index ---
+sentence-transformers==3.0.1
+chromadb==0.5.5
+
+# --- Later phases (uncomment as each phase begins) ---
+# Phase 4 — generation
+# groq==0.11.0
+# Phase 5 — API
+# fastapi==0.115.0
+# uvicorn==0.30.6
+# slowapi==0.1.9
+# Phase 7 — scheduler
+# APScheduler==3.10.4

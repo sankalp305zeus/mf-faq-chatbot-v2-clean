@@ -1,0 +1,41 @@
+# Active corpus — fixed 5 HDFC schemes on Groww.
+# Citations must come from this allowlist. Edit here, never hard-code URLs elsewhere.
+
+amc: HDFC Mutual Fund
+source: Groww (reference context)
+
+schemes:
+  - slug: hdfc-mid-cap-fund-direct-growth
+    scheme_name: HDFC Mid Cap Fund Direct Growth
+    category: Equity — Mid Cap
+    source_url: https://groww.in/mutual-funds/hdfc-mid-cap-fund-direct-growth
+    aliases: ["mid cap", "midcap", "hdfc mid cap"]
+
+  - slug: hdfc-large-cap-fund-direct-growth
+    scheme_name: HDFC Large Cap Fund Direct Growth
+    category: Equity — Large Cap
+    source_url: https://groww.in/mutual-funds/hdfc-large-cap-fund-direct-growth
+    aliases: ["large cap", "largecap", "hdfc large cap"]
+
+  - slug: hdfc-small-cap-fund-direct-growth
+    scheme_name: HDFC Small Cap Fund Direct Growth
+    category: Equity — Small Cap
+    source_url: https://groww.in/mutual-funds/hdfc-small-cap-fund-direct-growth
+    aliases: ["small cap", "smallcap", "hdfc small cap"]
+
+  - slug: hdfc-gold-etf-fund-of-fund-direct-plan-growth
+    scheme_name: HDFC Gold ETF Fund of Fund Direct Plan Growth
+    category: Commodity — Gold FoF
+    source_url: https://groww.in/mutual-funds/hdfc-gold-etf-fund-of-fund-direct-plan-growth
+    aliases: ["gold", "gold etf", "gold fof", "fund of fund", "hdfc gold"]
+
+  - slug: hdfc-defence-fund-direct-growth
+    scheme_name: HDFC Defence Fund Direct Growth
+    category: Equity — Sectoral / Thematic (Defence)
+    source_url: https://groww.in/mutual-funds/hdfc-defence-fund-direct-growth
+    aliases: ["defence", "defense", "defence fund", "hdfc defence"]
+
+# Educational links used only for refusal responses (not corpus citations).
+refusal_links:
+  amfi: https://www.amfiindia.com/investor-corner/investor-center/about-mf.html
+  sebi: https://investor.sebi.gov.in/
