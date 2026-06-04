@@ -9,6 +9,8 @@
 - **Phase 2 — DONE.** `index.py` ✅ `run.py` ✅. BGE-small-en-v1.5 (384-dim, cosine), ChromaDB `PersistentClient`, collection `mf_faq`, 51 docs persisted. Atomic pipeline via `run.py --skip-fetch` runs in ~19s.
 - **Phase 3 — DONE + Sentinel FARs resolved.** `app/retriever.py` ✅ `tests/test_retrieval.py` ✅ `tests/conftest.py` ✅. Two-stage retrieval with competitor-AMC guard (FAR-01), two-pass section-guarantee query replacing section boost (FAR-03), "exit strategy" keyword fix (FAR-04), `supported_schemes` in unresolved result (FAR-06), competitor-query false-match tests (FAR-02), disambiguation hint tests (FAR-05). 68 retrieval tests. Full suite: 96/96 pass. Smoke test 13/13 (8 positive + 5 competitor).
 - **Phase 4 — DONE + Sentinel FAR-P4-01/02 resolved.** `app/generator.py` ✅ `app/validator.py` ✅ `tests/test_generation.py` ✅. Groq generation (temp=0, max_tokens=256) with 6-path decision tree. Validator: sentence truncation, advisory pattern detection (13 regexes), numeric grounding check, citation allowlist enforcement. GenerationResult dataclass. MOCK_LLM fallback. 43 generation tests. Full suite: 139/139 pass (3 skipped = live Groq). Smoke test 7/7 OK.
+- **Phase 5 — DONE. Sentinel: no FARs.** `app/classifier.py` ✅ `app/formatter.py` ✅ `app/main.py` ✅ `tests/test_classifier.py` ✅. FastAPI POST /api/chat; lifespan BGE+ChromaDB warmup (FAR-07 closed); PII guard (PAN/Aadhaar/mobile/email); slowapi per-IP rate limit (20/minute); structured logging (no PII). Classifier: 5-class rules-based, 42 tests. Formatter: footer suppression on empty last_updated. groq upgraded to >=0.13.0 (httpx 0.28.x proxies compat). Full suite: 164/164 pass (20 skipped).
+- **Phase 6 — DONE.** `ui/streamlit_app.py` ✅. Disclaimer banner, 3 clickable example questions, free-text input, answer/refusal/citation/footer rendering, API_BASE env var for Railway.
 
 ## Phase map
 
@@ -19,8 +21,8 @@
 | 2 ✅ | Embed + index | Retrieval (L2) | `ingestion/index.py`, `ingestion/run.py`, `data/index/` |
 | 3 ✅ | Retrieval | Retrieval (L2) | `app/retriever.py` |
 | 4 ✅ | Generation | Generation (L3) | `app/generator.py` (Groq), `app/validator.py` |
-| 5 | API + compliance | Application (L4) | `app/main.py`, `classifier.py`, `formatter.py` |
-| 6 | UI | Presentation (L5) | `ui/index.html` |
+| 5 ✅ | API + compliance | Application (L4) | `app/main.py`, `classifier.py`, `formatter.py` |
+| 6 ✅ | UI | Presentation (L5) | `ui/streamlit_app.py` |
 | 7 | Scheduler + deploy | Ops | `scheduler/daily.py`, GitHub Actions, `deployment-plan.md` |
 
 **Critical path:** 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7.

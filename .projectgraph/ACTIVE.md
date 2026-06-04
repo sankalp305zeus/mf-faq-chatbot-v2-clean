@@ -5,17 +5,17 @@ Agent: Forge
 Mode: ai-rag
 
 ## Objective
-Phase 4 complete + Sentinel FAR fixes applied. 139 tests pass (43 generation, 68 retrieval, 28 prior). Smoke test 7/7 OK. Full multi-agent workflow: Maya (scope), Atlas (arch), Forge (impl), Sentinel (review + FAR-P4-01/02 fixed).
+Phase 5 + Phase 6 complete. 164 tests pass (42 classifier, 43 generation, 68 retrieval, 11 other). End-to-end: factual queries answered with Groq + citation + footer; advisory/comparison/performance/PII/unresolved-scheme all refused correctly. Streamlit UI wired to FastAPI. Full multi-agent workflow: Maya (scope), Atlas (arch), Forge (impl), Sentinel (review — no FARs).
 
 ## Last handoff
-File: journal/2026-06-04-build-forge-p4.md
-Summary: Implemented app/generator.py (Groq integration, 6-path decision tree, MOCK_LLM stub, link-only fallback) and app/validator.py (sentence truncation, advisory detection, numeric grounding, citation allowlist). tests/test_generation.py (43 unit + integration tests). Sentinel found 2 low-severity issues fixed: dead test guard removed (FAR-P4-01), `retrieve` moved to local import in smoke test (FAR-P4-02). ARCHITECTURE.md data contract updated for empty last_updated on refusals (FAR-P4-03 note).
+File: journal/2026-06-04-build-forge-p4.md (P4 reference)
+Summary: Phase 5 — app/classifier.py (5-class rules-based, comparison > advisory > performance priority), app/formatter.py (footer suppression on empty last_updated), app/main.py (FastAPI, lifespan BGE warmup, PII guard, slowapi rate limit, structured logging). app/retriever.py warmup() added (FAR-07 resolved). Phase 6 — ui/streamlit_app.py (disclaimer banner, 3 example buttons, answer/refusal/citation rendering, API_BASE env var). groq upgraded to >=0.13.0 to fix httpx 0.28.x proxies kwarg incompatibility.
 
 ## Last decision
-Grounding check: numeric substring matching (not token-level NLP) — conservative enough for this corpus, avoids hallucinated numbers reaching the user. Advisory detection: 13 regex patterns on lowercased generated text; forces is_refusal=True on match. Citation always sourced from retrieval_result.source_url (metadata), never extracted from generated text. LLM explicitly forbidden from including URLs in output.
+Classifier priority: comparison checked before advisory so "which is better" routes to comparison not advisory. Both are refusals — outcome identical. Slowapi + FastAPI body-parsing conflict resolved by reading body via request.json() instead of Pydantic injection parameter.
 
 ## Blocker
 None.
 
 ## Next
-Phase 5 — app/main.py (POST /api/chat), app/classifier.py (factual/advisory/comparison/perf/oos routing), app/formatter.py (JSON contract enforcement), PII guard, rate limiting. FAR-07 (BGE cold-start warmup) resolved in Phase 5 startup hook.
+Phase 7 — scheduler/daily.py (APScheduler, 10:00 AM IST), GitHub Actions ingest.yml, Railway deployment, docs/deployment-plan.md, README.

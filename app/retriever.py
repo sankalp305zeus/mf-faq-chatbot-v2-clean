@@ -380,6 +380,19 @@ def retrieve(
     )
 
 
+# ── Startup warmup (FAR-07) ───────────────────────────────────────────────────
+
+def warmup() -> None:
+    """Pre-load the BGE model and ChromaDB collection to eliminate cold-start latency.
+
+    Called once from app/main.py lifespan startup hook.
+    Embeds a dummy string so the model is fully initialised before the first real request.
+    """
+    model = _get_model()
+    model.encode("warmup", normalize_embeddings=True)
+    _get_collection()
+
+
 # ── Smoke test ────────────────────────────────────────────────────────────────
 
 _SMOKE_QUERIES = [

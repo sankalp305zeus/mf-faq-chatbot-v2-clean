@@ -10,10 +10,12 @@ sentence-transformers==3.0.1
 chromadb==0.5.5
 
 # --- Phase 4: generation ---
-groq==0.11.0
+groq>=0.13.0
 # Phase 5 — API
-# fastapi==0.115.0
-# uvicorn==0.30.6
-# slowapi==0.1.9
+fastapi==0.115.0
+uvicorn==0.30.6
+slowapi==0.1.9
+# Phase 6 — UI
+streamlit==1.36.0
 # Phase 7 — scheduler
 # APScheduler==3.10.4
