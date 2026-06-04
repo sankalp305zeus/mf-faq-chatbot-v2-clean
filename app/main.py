@@ -120,10 +120,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="MF FAQ Assistant", version="0.5.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS — origins are configurable via ALLOWED_ORIGINS env var so production
+# deployments can be locked to the specific frontend URL.
+# ALLOWED_ORIGINS="*"  → wildcard (local dev default)
+# ALLOWED_ORIGINS="https://foo.up.railway.app,https://bar.example.com"  → explicit list
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "*")
+_allow_origins: list[str] = (
+    [o.strip() for o in _raw_origins.split(",") if o.strip()]
+    if _raw_origins.strip() != "*"
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "POST"],
+    allow_origins=_allow_origins,
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
