@@ -57,10 +57,11 @@ Layer 1 — Offline ingest  ingestion/ + scheduler/   (fetch→parse→chunk→e
 {
   "answer": "string — ≤3 sentences",
   "citation_url": "string — allowlisted corpus URL (or AMFI/SEBI for refusal)",
-  "last_updated": "string — YYYY-MM-DD from chunk metadata",
+  "last_updated": "string — YYYY-MM-DD from chunk metadata; empty string for refusals (no chunks → no date)",
   "is_refusal": "bool"
 }
 ```
+Note: `last_updated` is empty for unresolved-scheme and advisory refusals. Phase 5 formatter must suppress the "Last updated" footer when `last_updated` is empty.
 
 ### Chunk record (ChromaDB document)
 ```json
