@@ -2,7 +2,7 @@
 
 **Incident:** HTTP 403 on `POST /api/chat` from Streamlit frontend to FastAPI backend  
 **Opened:** 2026-06-05  
-**Status:** Active — root cause unconfirmed, next test identified
+**Status:** Fix committed and pushed. Two Railway dashboard actions remaining before production is operational. See DEPLOYMENT_HANDOFF.md operator checklist.
 
 ---
 
@@ -106,6 +106,38 @@
 
 ---
 
+**FACT-013**  
+**Description:** The `mf-faq-chatbot-v2-clean` (API) service is running Streamlit, not FastAPI/uvicorn.  
+**Evidence:** Railway Deploy Logs for `mf-faq-chatbot-v2-clean` show: `Starting Container` → `You can now view your Streamlit app in your browser. URL: http://0.0.0.0:8080` → `Collecting usage statistics...` — identical Streamlit startup sequence to the frontend service.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-014**  
+**Description:** `railway.toml` has exactly one `[deploy]` block with no per-service scoping. Both Railway services read and apply the same `startCommand`.  
+**Evidence:** `railway.toml` lines 15–26 — single `[deploy]` section, `startCommand = "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"`. Railway's `railway.toml` spec supports per-service configuration only via dashboard overrides or a `[[services]]` block; neither exists in this file. No `Dockerfile`, `Procfile`, or `nixpacks.toml` present in the repo root.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-015**  
+**Description:** No `Dockerfile`, `Procfile`, `nixpacks.toml`, or `railway.json` exists in the repository. The only deployment configuration file is `railway.toml`.  
+**Evidence:** `find` output across repo root and subdirectories — only `railway.toml` returned.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-016**  
+**Description:** `railway.toml` comment block (lines 1–10) explicitly describes the intent as a FastAPI backend file and mentions a separate Streamlit UI service — but the `startCommand` on line 21 is Streamlit, directly contradicting the documented intent.  
+**Evidence:** `railway.toml` lines 1–10 vs line 21. Comment was written for the original API-only configuration; line 21 was overwritten by commit `21a68ba` (Streamlit UI deployment) and never restored.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
 ## DISPROVEN
 
 ---
@@ -142,69 +174,180 @@
 
 ---
 
+**DISPROVEN-005**  
+**Description:** "`mf-faq-chatbot-v2-clean` might have a per-service start command override in the Railway dashboard that runs uvicorn — and the 403 has a different cause."  
+**Evidence:** FACT-013 — deploy logs confirm Streamlit is running. If a uvicorn override existed, logs would show `Uvicorn running on http://0.0.0.0:8080` or the BGE warmup message instead.  
+**Status:** Disproven  
+**Last Updated:** 2026-06-05
+
+---
+
 ## UNKNOWNS
 
 ---
 
 **UNKNOWN-001**  
 **Description:** What process is the `mf-faq-chatbot-v2-clean` service actually running — FastAPI/uvicorn or Streamlit?  
-**Evidence needed:** Deploy Logs for `mf-faq-chatbot-v2-clean` — startup lines. If Streamlit is running, it would explain the 403 (Streamlit returns 403 for POST requests to paths it does not recognise). If uvicorn is running, a different root cause applies.  
-**Hypothesis:** Since both services deploy from the same `railway.toml` (FACT-011, FACT-007) and `railway.toml` `startCommand` is Streamlit (FACT-007), the API service is also running Streamlit — unless it has a per-service start command override in Railway dashboard.  
-**Status:** Unresolved  
+**Status:** **RESOLVED** — FACT-013 confirms Streamlit is running.  
 **Last Updated:** 2026-06-05
 
 ---
 
 **UNKNOWN-002**  
-**Description:** Does the `mf-faq-chatbot-v2-clean` service have a custom start command override set in the Railway dashboard (which would take precedence over `railway.toml`)?  
-**Evidence needed:** Railway dashboard → `mf-faq-chatbot-v2-clean` → Deployments → active deployment → Details → Configuration → Start command.  
-**Status:** Unresolved  
+**Description:** Does the `mf-faq-chatbot-v2-clean` service have a custom start command override set in the Railway dashboard?  
+**Status:** **RESOLVED** — DISPROVEN-005 confirms no override exists. Deploy logs match `railway.toml` Streamlit command exactly.  
 **Last Updated:** 2026-06-05
 
 ---
 
 **UNKNOWN-003**  
 **Description:** What are the exact deploy log startup lines for `mf-faq-chatbot-v2-clean`'s current active deployment?  
-**Evidence needed:** Railway dashboard → `mf-faq-chatbot-v2-clean` → Deploy Logs.  
-**Status:** Unresolved  
+**Status:** **RESOLVED** — `Starting Container` → `You can now view your Streamlit app in your browser. URL: http://0.0.0.0:8080` → `Collecting usage statistics...`  
 **Last Updated:** 2026-06-05
 
 ---
 
 **UNKNOWN-004**  
-**Description:** What does `GET http://mf-faq-chatbot-v2-clean.railway.internal:8080/health` return — `{"status":"ok"}` (FastAPI) or HTML (Streamlit)?  
-**Evidence needed:** Can be tested from the `adventurous-inspiration` container via Railway console: `curl http://mf-faq-chatbot-v2-clean.railway.internal:8080/health`  
-**Status:** Unresolved  
+**Description:** What does `GET http://mf-faq-chatbot-v2-clean.railway.internal:8080/health` return — `{"status":"ok"}` (FastAPI) or HTML/403 (Streamlit)?  
+**Status:** Unresolved — not yet tested. Lower priority now that root cause is confirmed; no longer needed to confirm root cause, only to verify fix after implementation.  
 **Last Updated:** 2026-06-05
 
 ---
 
 **UNKNOWN-005**  
 **Description:** What environment variables are currently set on the `mf-faq-chatbot-v2-clean` service?  
-**Evidence needed:** Railway dashboard → `mf-faq-chatbot-v2-clean` → Variables tab.  
-**Status:** Unresolved  
+**Status:** Unresolved — still unknown. Required before any fix is deployed (must confirm `GROQ_API_KEY`, `CHROMA_PATH`, `COLLECTION_NAME` are present on the API service, not just the frontend service).  
 **Last Updated:** 2026-06-05
 
 ---
 
-## NEXT TEST
+## ROOT CAUSE (Confirmed)
 
-**Experiment:** Open Railway dashboard → click `mf-faq-chatbot-v2-clean` → Deploy Logs → read first 5 lines of active deployment.
+**Commit `21a68ba`** changed `railway.toml` `startCommand` from the uvicorn command to the Streamlit command in order to deploy the frontend service. Because `railway.toml` has a single global `[deploy]` block (no per-service scoping), this change applied to **both** Railway services on next push. `mf-faq-chatbot-v2-clean` has been running Streamlit ever since. Streamlit's Tornado HTTP server returns HTTP 403 for POST requests to paths it does not handle — including `/api/chat`.
 
-**Cost:** 30 seconds. Zero code changes. Zero deployments.
-
-**Decision tree:**
+**Startup chain for `mf-faq-chatbot-v2-clean` (current):**
 
 ```
-Deploy logs show Streamlit startup messages
-  → UNKNOWN-001 resolved: API service is running Streamlit
-  → UNKNOWN-002 resolved: no custom start command override exists
-  → Root cause confirmed: both services run Streamlit from same railway.toml
-  → Fix identified: set per-service start command on mf-faq-chatbot-v2-clean
-    to "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-
-Deploy logs show uvicorn/FastAPI startup messages
-  → UNKNOWN-001 resolved: API service is running correctly
-  → Root cause is elsewhere (Railway private network access control, or other)
-  → Next step: inspect HTTP logs for mf-faq-chatbot-v2-clean
+Railway → reads railway.toml [deploy].startCommand
+        → "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
+        → Streamlit Tornado server binds port 8080
+        → POST /api/chat → 403 Forbidden
 ```
+
+No Dockerfile, Procfile, or nixpacks.toml exists to override this. No Railway dashboard override exists.
+
+---
+
+## STARTUP COMMAND PRECEDENCE (Railway)
+
+Railway resolves the start command in this order (highest → lowest):
+
+1. **Railway dashboard "Start Command" override** (per-service) — not set (confirmed by FACT-013 matching `railway.toml`)
+2. **`railway.toml` `[deploy].startCommand`** — ← **this is what runs** — currently Streamlit
+3. **`Procfile`** — does not exist
+4. **Nixpacks auto-detection** — overridden by step 2
+5. **Dockerfile `CMD`** — does not exist
+
+---
+
+## SMALLEST FIX TO RESTORE UVICORN
+
+**Option A — Railway dashboard override (zero code change, zero git commit)**
+
+In Railway dashboard → `mf-faq-chatbot-v2-clean` → Settings → Deploy → Start Command, enter:
+
+```
+python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+This per-service override takes precedence over `railway.toml` and does not affect the `adventurous-inspiration` frontend service. Railway will redeploy automatically on save.
+
+**Tradeoff:** The override lives only in the Railway dashboard. It is not tracked in git, so it is invisible to future developers and will be lost if the service is deleted and recreated.
+
+---
+
+**Option B — Fix `railway.toml` with per-service scoping (one git commit, redeploy required)**
+
+Replace the global `[deploy]` block with two `[[services]]` blocks (Railway's per-service TOML syntax):
+
+```toml
+[[services]]
+name = "mf-faq-chatbot-v2-clean"
+[services.deploy]
+startCommand = "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "adventurous-inspiration"
+[services.deploy]
+startCommand = "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+```
+
+**Tradeoff:** Git-tracked, self-documenting. Requires one commit and one redeploy of both services. Railway's support for `[[services]]` in `railway.toml` should be verified against current docs before implementation.
+
+---
+
+---
+
+**FACT-017**  
+**Description:** `GET https://mf-faq-chatbot-v2-clean-production.up.railway.app/health` returns Streamlit HTML, not `{"status":"ok"}`.  
+**Evidence:** `curl` response is the Streamlit SPA bootstrap HTML (`<!doctype html>...<title>Streamlit</title>...`). If FastAPI were running, this endpoint returns `{"status":"ok"}` (confirmed from `app/main.py` `/health` handler). Streamlit serves its own index.html for all GET requests it does not recognise as WebSocket upgrades.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-018**  
+**Description:** `POST https://mf-faq-chatbot-v2-clean-production.up.railway.app/api/chat` returns `403: Forbidden` — same error class as the private network path.  
+**Evidence:** `curl -X POST .../api/chat` returns `<html><title>403: Forbidden</title><body>403: Forbidden</body></html>` — Streamlit's Tornado HTTP server responding to an unrecognised POST path. This is the public-internet equivalent of the `railway.internal` 403 already documented in FACT-005.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-019**  
+**Description:** All required env vars for the API service are present in the project `.env` file: `GROQ_API_KEY`, `GROQ_MODEL`, `CHROMA_PATH`, `COLLECTION_NAME`.  
+**Evidence:** `.env` contains `GROQ_API_KEY=gsk_...`, `GROQ_MODEL=llama-3.3-70b-versatile`, `CHROMA_PATH=data/index`, `COLLECTION_NAME=mf_faq`. Whether these are set on the Railway `mf-faq-chatbot-v2-clean` service is still UNKNOWN-005 — this fact only confirms their values are known and available to add if missing.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+**FACT-020**  
+**Description:** Railway CLI is not authenticated on this machine. No `RAILWAY_TOKEN` or `RAILWAY_API_TOKEN` is present in the local environment, `.env`, or `~/.railway/` config directory.  
+**Evidence:** `railway whoami` → `Unauthorized`. `~/.railway/` contains only `version.json` with update metadata, no auth token. `env | grep -i railway` → no results.  
+**Status:** Confirmed  
+**Last Updated:** 2026-06-05
+
+---
+
+## NEXT HIGHEST-EV EXPERIMENT
+
+**Hard blocker: RAILWAY_API_TOKEN not available on this machine (FACT-020).**
+
+All remaining fix steps require authenticated Railway access:
+- Setting the start command override on `mf-faq-chatbot-v2-clean`
+- Inspecting variables on that service (UNKNOWN-005)
+- Triggering redeploy
+- Watching deploy logs
+
+**To unblock:** provide `RAILWAY_API_TOKEN` via one of:
+
+```
+# Option A — set in terminal, then re-run
+export RAILWAY_API_TOKEN=<your token>
+
+# Option B — add to .env (do NOT commit)
+RAILWAY_API_TOKEN=<your token>
+```
+
+Token location: Railway dashboard → top-right avatar → **Account Settings** → **Tokens** → Create new token.
+
+Once the token is available, the full fix sequence can execute without further manual steps.

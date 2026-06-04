@@ -1,54 +1,62 @@
 # Deployment Posture — MF FAQ Chatbot v2
 
-**As of:** 2026-06-05  
-**Incident:** Active — 403 on API calls from Streamlit frontend
+**As of:** 2026-06-05 — split-config fix committed and pushed
+**Incident:** Active — fix deployed to git, two Railway dashboard actions pending
 
 ---
 
 ## What is working?
 
 - Streamlit UI loads and renders at `https://adventurous-inspiration-production-7f7f.up.railway.app`
-- Streamlit service starts successfully on port 8080 and passes Railway health check
-- `mf-faq-chatbot-v2-clean` service is Online (Railway canvas) and accepts TCP connections on port 8080
+- `mf-faq-chatbot-v2-clean` service is Online and accepts TCP connections on port 8080
 - Full local pipeline: 164/164 tests pass
-- All application code is deployed (current HEAD `72ad5e1` pushed to `origin/main`)
-- `API_BASE` environment variable is correctly set and correctly used in code
+- All application code is deployed (current HEAD pushed to `origin/main`)
+- `API_BASE` env var is correctly set and correctly used in code
+- `railway.toml` now contains the correct uvicorn startCommand (restored)
+- `railway.ui.toml` now exists with the correct Streamlit startCommand
 
 ## What is not working?
 
-- `POST /api/chat` returns `403 Client Error: Forbidden` — no user questions can be answered
-- End-to-end chat flow is completely broken in production
+- `POST /api/chat` still returns `403 Client Error: Forbidden` — Railway has not yet redeployed with the new config
+- `GET /health` on API service returns Streamlit HTML — same reason
+- End-to-end chat flow is completely broken in production until Railway redeploys
 
 ## What is assumed?
 
 | Assumption | Basis |
 |-----------|-------|
-| The API service (`mf-faq-chatbot-v2-clean`) is running Streamlit instead of uvicorn | Both services use same `railway.toml`; `railway.toml` `startCommand` is currently Streamlit; no evidence of a per-service override |
-| Port 8080 is consistent across both services | Railway default `$PORT` is typically 8080; confirmed for Streamlit service |
-| The 403 comes from Streamlit's internal HTTP server rejecting a POST to an unknown path | Streamlit's Tornado-based server returns 403 for POST requests to paths it does not handle |
+| Railway will pick up `railway.toml` for API service and `railway.ui.toml` for UI service once each service's "Railway Config File" is set in dashboard Settings | Railway docs: "You can use a custom config file by setting it on the service settings page" |
+| Config-as-code overrides any dashboard start command setting | Railway docs: "Configuration defined in code will always override values from the dashboard" |
+| `GROQ_API_KEY` is set on `mf-faq-chatbot-v2-clean` — not yet verified (UNKNOWN-005) | Assumed from .env presence; not confirmed in Railway Variables |
 
 ## What is proven?
 
-- The 403 URL is `http://mf-faq-chatbot-v2-clean.railway.internal:8080/api/chat` — confirmed from UI error
-- Something is listening on port 8080 at that internal address and returning HTTP (not a network failure)
-- FastAPI application code has no 403 path — if FastAPI were running, 403 would be impossible from application logic
-- `railway.toml` `startCommand` = Streamlit — confirmed from repo
-- Streamlit service runs Streamlit — confirmed from Railway deploy logs
+- Root cause: commit `21a68ba` set `railway.toml` `startCommand` to Streamlit, applied globally to both services
+- `mf-faq-chatbot-v2-clean` deploy logs: `You can now view your Streamlit app in your browser` (FACT-013)
+- `GET /health` on API public URL returns Streamlit HTML, not `{"status":"ok"}` (FACT-017)
+- `POST /api/chat` returns `<html><title>403: Forbidden</title>` from Streamlit Tornado (FACT-018)
+- FastAPI has no 403 code path — if FastAPI were running, 403 from `/api/chat` is impossible (FACT-009)
+- Dashboard start command override cannot override `railway.toml` — confirmed in Railway docs
 
-## What is the exact current blocker?
+## What evidence is still missing?
 
-The `mf-faq-chatbot-v2-clean` service appears to be running Streamlit (not FastAPI/uvicorn) because both services deploy from the same `railway.toml`, which currently has `startCommand = "streamlit run ui/streamlit_app.py ..."`. Streamlit's internal HTTP server returns 403 for POST requests to `/api/chat` because it does not recognise that path. The FastAPI API is not running in production.
+1. Variables on `mf-faq-chatbot-v2-clean` — GROQ_API_KEY presence specifically (UNKNOWN-005)
 
-## What evidence is missing?
+## Exact current blocker
 
-1. Deploy Logs for `mf-faq-chatbot-v2-clean` — what process actually starts
-2. Start command override (if any) in Railway dashboard for `mf-faq-chatbot-v2-clean`
-3. Variables on `mf-faq-chatbot-v2-clean` service
+Two Railway dashboard actions are required and cannot be automated without RAILWAY_API_TOKEN:
 
-## What is the single highest-value next test?
+### Action 1 — Frontend
+`adventurous-inspiration` → Settings → Railway Config File → `/railway.ui.toml` → Save
 
-**Open Railway dashboard → `mf-faq-chatbot-v2-clean` → Deploy Logs → read startup lines.**
+### Action 2 — Backend
+`mf-faq-chatbot-v2-clean` → Variables → confirm GROQ_API_KEY present
+`mf-faq-chatbot-v2-clean` → Settings → Railway Config File → `/railway.toml` (or blank) → Save
 
-If the logs show `You can now view your Streamlit app in your browser` → root cause is confirmed, fix is to set a per-service start command override in Railway dashboard for `mf-faq-chatbot-v2-clean` to `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+## Definition of Done
 
-This test takes 30 seconds, requires no code changes, and resolves the primary unknown.
+All four must pass:
+1. `mf-faq-chatbot-v2-clean` deploy logs: ingestion output + `Uvicorn running on http://0.0.0.0:PORT`
+2. `GET https://mf-faq-chatbot-v2-clean-production.up.railway.app/health` → `{"status":"ok"}`
+3. `POST /api/chat` with `{"question":"What is the expense ratio of HDFC Flexi Cap Fund?"}` → valid JSON answer with citation
+4. `https://adventurous-inspiration-production-7f7f.up.railway.app` returns a real MF FAQ answer in UI chat — no 403/500 error bubble

@@ -1,26 +1,30 @@
 # Active
 
-Phase: Production incident — deployment freeze
-Agent: Scribe + Maya (checkpoint)
+Phase: Production fix — Railway split-config deployed, awaiting dashboard operator action
+Agent: Maya + Sentinel + Forge
 Mode: ai-rag
 
 ## Objective
-Production incident active. Streamlit UI returns `403 Client Error: Forbidden for url: http://mf-faq-chatbot-v2-clean.railway.internal:8080/api/chat`. Deployment checkpoint created. No debugging or fixes permitted until ledger is reviewed and next experiment is run.
 
-## Last handoff
-Files created: DEPLOYMENT_HANDOFF.md, INVESTIGATION_LEDGER.md, DEPLOYMENT_POSTURE.md — 2026-06-05.
-Commit: docs: add production deployment handoff package. Branch: main. Push: confirmed.
+Fix confirmed root cause: mf-faq-chatbot-v2-clean was running Streamlit instead of FastAPI because both Railway services shared a single railway.toml with startCommand = Streamlit.
 
-## Last decision
-Deployment frozen. All findings documented. Single highest-EV next test identified: open Railway dashboard → mf-faq-chatbot-v2-clean → Deploy Logs → confirm whether the API service is running Streamlit or uvicorn. This resolves UNKNOWN-001 and either confirms or disproves the primary hypothesis (both services running Streamlit due to shared railway.toml).
+Fix: split-config architecture — railway.toml (API/uvicorn) + railway.ui.toml (UI/Streamlit). Committed and pushed. Awaiting operator to set "Railway Config File" per service in Railway dashboard.
 
-## Blocker
-CRITICAL: POST /api/chat returns 403 in production. mf-faq-chatbot-v2-clean service is suspected to be running Streamlit (not FastAPI) because both services deploy from the same railway.toml, which currently has startCommand = "streamlit run ui/streamlit_app.py ...". Root cause unconfirmed pending next test.
+## Commit
 
-## Known discrepancy
-railway.toml comment says "startCommand runs ingestion before uvicorn" but the actual startCommand is "streamlit run ui/streamlit_app.py ...". This inconsistency must be resolved before next deploy.
+fix: split Railway config per service — restore API startCommand to uvicorn
+Branch: main. Push: confirmed (see commit hash in DEPLOYMENT_HANDOFF.md).
 
-## Next
-1. EXPERIMENT (no code, no deploy): Open Railway → mf-faq-chatbot-v2-clean → Deploy Logs → read startup lines
-2. If Streamlit confirmed: set per-service start command override in Railway dashboard for mf-faq-chatbot-v2-clean to "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
-3. If uvicorn confirmed: inspect HTTP logs for mf-faq-chatbot-v2-clean for alternative root cause
+## Blocker (operator action required — cannot be automated without RAILWAY_API_TOKEN)
+
+Two Railway dashboard actions remaining before redeployment:
+
+1. adventurous-inspiration → Settings → Railway Config File → /railway.ui.toml → Save
+2. mf-faq-chatbot-v2-clean → Settings → Railway Config File → /railway.toml (or blank) → Save + Redeploy
+
+## Definition of Done
+
+- mf-faq-chatbot-v2-clean deploy logs show ingestion output + "Uvicorn running"
+- GET /health → {"status":"ok"}
+- POST /api/chat → valid JSON answer with citation
+- https://adventurous-inspiration-production-7f7f.up.railway.app loads and returns a real MF FAQ answer in chat

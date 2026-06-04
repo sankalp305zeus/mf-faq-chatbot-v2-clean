@@ -1,8 +1,8 @@
 # Deployment Handoff — MF FAQ Chatbot v2
 
 **Created:** 2026-06-05  
-**Status:** Production incident in progress — 403 on API calls from Streamlit frontend  
-**Freeze reason:** Checkpoint before continued debugging
+**Updated:** 2026-06-05 — split-config fix committed and pushed  
+**Status:** Fix deployed to git. Two Railway dashboard actions pending before production is operational.
 
 ---
 
@@ -62,10 +62,10 @@ Online path (per request):
 | Service name | `mf-faq-chatbot-v2-clean` |
 | Public URL | `https://mf-faq-chatbot-v2-clean-production.up.railway.app` |
 | Private network URL | `http://mf-faq-chatbot-v2-clean.railway.internal:8080` |
+| Config file | `railway.toml` (default — must be set or confirmed in Railway dashboard Settings) |
 | Expected start command | `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| Actual running process | **UNKNOWN** — deploy logs not inspected for this service |
-| Status | Online (visible green dot in Railway canvas) |
-| Active deployment | **UNKNOWN** |
+| Actual running process | **Streamlit** (confirmed FACT-013) — pending redeploy with corrected config |
+| Status | Online but broken — returns 403 on /api/chat |
 
 ---
 
@@ -100,11 +100,17 @@ Online path (per request):
 - Error observed: `Unexpected error: 403 Client Error: Forbidden for url: http://mf-faq-chatbot-v2-clean.railway.internal:8080/api/chat`
 - 403 is returned from Railway private network, not the public internet
 
-### Phase: CORS hardening (commit `72ad5e1`, current HEAD)
+### Phase: CORS hardening (commit `72ad5e1`)
 - `app/main.py` updated: `allow_origins` now reads from `ALLOWED_ORIGINS` env var (defaults to `"*"`)
 - `allow_methods` now includes `OPTIONS`
 - **This does not fix the 403** — documented in commit message
-- Pushed to `origin/main` — awaiting Railway redeploy
+
+### Phase: Split-config fix (current HEAD)
+- **Root cause confirmed:** commit `21a68ba` overwrote `railway.toml` `startCommand` to Streamlit. Both Railway services share one `railway.toml` with no per-service scoping. `mf-faq-chatbot-v2-clean` has been running Streamlit since that commit.
+- **Railway docs confirmed:** config-as-code always overrides dashboard. Dashboard Start Command override would have no effect while `railway.toml` sets a conflicting `startCommand`.
+- **Fix:** split into two config files. `railway.toml` restored to uvicorn. `railway.ui.toml` created for Streamlit UI.
+- **Each Railway service must be pointed to its config file via "Railway Config File" in dashboard Settings.**
+- Committed and pushed to `origin/main`.
 
 ---
 
@@ -238,7 +244,8 @@ return {
 
 | File | Relevance |
 |------|-----------|
-| `railway.toml` | **Critical** — `startCommand` currently set to Streamlit; may be wrong for API service |
+| `railway.toml` | API service config — `startCommand` = uvicorn (restored by split-config fix) |
+| `railway.ui.toml` | UI service config — `startCommand` = Streamlit (new file, created by split-config fix) |
 | `app/main.py` | CORS config, `/health` endpoint, `/api/chat` handler |
 | `ui/streamlit_app.py` | `API_BASE` reading (line 26), `API_URL` construction (line 27), `call_api()` function |
 | `docs/deployment-plan.md` | Deployment runbook, bootstrap strategy |
@@ -247,13 +254,29 @@ return {
 
 ---
 
-## Next Investigation
+## Operator Checklist — Railway Dashboard Actions (required to complete fix)
 
-**Single highest-EV next test:**
+Code is pushed. These two dashboard actions must be completed by a human with Railway access.
 
-Open Railway dashboard → click `mf-faq-chatbot-v2-clean` service → **Deploy Logs** → read startup lines.
+### Action 1 — Frontend service
+- Service: `adventurous-inspiration`
+- Dashboard: Settings → General → **Railway Config File**
+- Set to: `/railway.ui.toml`
+- Save (triggers redeploy automatically)
 
-| Observed output | Conclusion | Action |
-|----------------|-----------|--------|
-| `You can now view your Streamlit app in your browser` | API service is running Streamlit (same `railway.toml` applied to both). Streamlit returns 403 for POST to unknown paths. | Override start command in Railway dashboard for `mf-faq-chatbot-v2-clean` to `python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| `startup: warming up BGE model and ChromaDB` | API is running correctly. Root cause is elsewhere — inspect HTTP logs for the API service. | Investigate Railway HTTP logs for `mf-faq-chatbot-v2-clean` |
+### Action 2 — Backend service
+- Service: `mf-faq-chatbot-v2-clean`
+- Dashboard: **Variables** tab — confirm all four are present:
+  - `GROQ_API_KEY` (required — LLM calls fail without it)
+  - `GROQ_MODEL` (optional, default: `llama-3.3-70b-versatile`)
+  - `CHROMA_PATH` (optional, default: `data/index`)
+  - `COLLECTION_NAME` (optional, default: `mf_faq`)
+- Dashboard: Settings → General → **Railway Config File**
+- Set to: `/railway.toml` (or leave blank — Railway reads `railway.toml` by default)
+- Save (triggers redeploy automatically)
+
+### Verification sequence (in order)
+1. Watch `mf-faq-chatbot-v2-clean` deploy logs — must show ingestion output + `Uvicorn running`
+2. `curl https://mf-faq-chatbot-v2-clean-production.up.railway.app/health` → `{"status":"ok"}`
+3. `curl -X POST .../api/chat -d '{"question":"What is the expense ratio of HDFC Flexi Cap Fund?"}'` → valid JSON
+4. Open `https://adventurous-inspiration-production-7f7f.up.railway.app` → submit same question → real answer in UI

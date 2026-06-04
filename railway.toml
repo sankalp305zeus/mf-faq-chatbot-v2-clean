@@ -1,24 +1,22 @@
 # Railway deployment configuration — MF FAQ Assistant (FastAPI backend)
 #
+# This file is read by the mf-faq-chatbot-v2-clean (API) service.
+# The adventurous-inspiration (UI) service uses /railway.ui.toml.
+# Set "Railway Config File" per service in Railway dashboard Settings.
+#
 # Bootstrap: startCommand runs ingestion before uvicorn so the ChromaDB index
 # is built inside the runtime container.  First deploy ~80s (BGE download);
 # subsequent deploys ~19s (BGE cached).  healthcheckTimeout=300 accommodates this.
 #
-# Two services are required for a full deployment:
-#   1. api   — this file; FastAPI backend on PORT assigned by Railway
-#   2. ui    — streamlit run ui/streamlit_app.py (set API_BASE=<api URL>)
-# See docs/deployment-plan.md for step-by-step instructions.
+# (Railway's releaseCommand runs in a separate ephemeral container whose
+# filesystem is discarded before the runtime container starts — ingestion must
+# run in the same process as uvicorn to persist the index.)
 
 [build]
 builder = "nixpacks"
 
 [deploy]
-# Bootstrap: ingestion runs in the same runtime container as the API so the
-# ChromaDB index written to data/index/ is immediately readable by the server.
-# (Railway's releaseCommand runs in a separate ephemeral container whose
-# filesystem is discarded before the runtime container starts — see
-# docs/deployment-plan.md for a full explanation.)
-startCommand = "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
+startCommand = "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"

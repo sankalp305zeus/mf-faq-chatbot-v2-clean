@@ -1,0 +1,17 @@
+# Railway deployment configuration — MF FAQ Assistant (Streamlit UI)
+#
+# This file is read by the adventurous-inspiration (UI) service only.
+# Set "Railway Config File" to /railway.ui.toml in Railway dashboard
+# Settings for the adventurous-inspiration service.
+#
+# The mf-faq-chatbot-v2-clean (API) service uses /railway.toml (default).
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0"
+healthcheckPath = "/_stcore/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
