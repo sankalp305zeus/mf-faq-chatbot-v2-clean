@@ -191,6 +191,10 @@ async def chat(request: Request):
     generation_result = generate(message, retrieval_result)
     response_body = format_response(generation_result)
 
+    # Additive UI metadata for "Why this answer?" panel — never breaks existing contract
+    response_body["scheme_name"] = retrieval_result.scheme_name
+    response_body["section_intent"] = retrieval_result.section_intent
+
     logger.info(
         "chat: query_class=%s scheme=%s is_refusal=%s latency_ms=%.0f",
         query_class,
