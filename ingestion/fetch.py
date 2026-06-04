@@ -16,15 +16,13 @@ from pathlib import Path
 
 import requests
 
-from ingestion.config import RAW_DIR, env, load_corpus
+from app.config import settings
+from ingestion.config import RAW_DIR, load_corpus
 
 
 def _headers() -> dict:
     return {
-        "User-Agent": env(
-            "FETCH_USER_AGENT",
-            "Mozilla/5.0 (compatible; mf-faq-bot/0.1; +https://example.com)",
-        ),
+        "User-Agent": settings.fetch_user_agent,
         "Accept": "text/html,application/xhtml+xml",
         "Accept-Language": "en-IN,en;q=0.9",
     }
@@ -89,8 +87,8 @@ def main() -> int:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     corpus = load_corpus()
     schemes = corpus["schemes"]
-    timeout = int(env("FETCH_TIMEOUT", "20"))
-    retries = int(env("FETCH_RETRIES", "1"))
+    timeout = settings.fetch_timeout
+    retries = settings.fetch_retries
 
     print(f"Fetching {len(schemes)} corpus URLs -> {RAW_DIR}")
     results = [fetch_one(s, timeout, retries) for s in schemes]

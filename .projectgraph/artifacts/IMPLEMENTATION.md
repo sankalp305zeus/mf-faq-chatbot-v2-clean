@@ -7,6 +7,7 @@
 - **Phase 0 — DONE.** Scaffold, `.gitignore`, `requirements.txt`, `.env.example`, `config/corpus.yaml`. Imports succeed; no secrets committed.
 - **Phase 1 — DONE.** `fetch.py` ✅ `parse.py` ✅ `sections.py` ✅ `chunk.py` ✅. 5/5 pages → 51 total chunks (1 per section per scheme; 1 per manager bio for fund_management). 28 tests pass.
 - **Phase 2 — DONE.** `index.py` ✅ `run.py` ✅. BGE-small-en-v1.5 (384-dim, cosine), ChromaDB `PersistentClient`, collection `mf_faq`, 51 docs persisted. Atomic pipeline via `run.py --skip-fetch` runs in ~19s.
+- **Phase 3 — DONE + Sentinel FARs resolved.** `app/retriever.py` ✅ `tests/test_retrieval.py` ✅ `tests/conftest.py` ✅. Two-stage retrieval with competitor-AMC guard (FAR-01), two-pass section-guarantee query replacing section boost (FAR-03), "exit strategy" keyword fix (FAR-04), `supported_schemes` in unresolved result (FAR-06), competitor-query false-match tests (FAR-02), disambiguation hint tests (FAR-05). 68 retrieval tests. Full suite: 96/96 pass. Smoke test 13/13 (8 positive + 5 competitor).
 
 ## Phase map
 
@@ -15,7 +16,7 @@
 | 0 ✅ | Setup | Repo + config | skeleton, `.env.example`, `config/corpus.yaml`, deps |
 | 1 ✅ | Ingestion | Offline (L1) | `fetch.py`, `parse.py`, `sections.py`, `chunk.py` |
 | 2 ✅ | Embed + index | Retrieval (L2) | `ingestion/index.py`, `ingestion/run.py`, `data/index/` |
-| 3 | Retrieval | Retrieval (L2) | `app/retriever.py` |
+| 3 ✅ | Retrieval | Retrieval (L2) | `app/retriever.py` |
 | 4 | Generation | Generation (L3) | `app/generator.py` (Groq), `app/validator.py` |
 | 5 | API + compliance | Application (L4) | `app/main.py`, `classifier.py`, `formatter.py` |
 | 6 | UI | Presentation (L5) | `ui/index.html` |

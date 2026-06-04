@@ -1,7 +1,10 @@
-"""Shared paths and corpus loading for the ingestion pipeline."""
+"""Shared paths and corpus loading for the ingestion pipeline.
+
+Environment-variable access has moved to app/config.py (settings).
+This module only owns filesystem paths and corpus schema helpers.
+"""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import yaml
@@ -38,7 +41,3 @@ def load_corpus(path: Path = CONFIG_PATH) -> dict:
             if not s.get(field):
                 raise ValueError(f"Scheme missing required field '{field}': {s}")
     return data
-
-
-def env(name: str, default: str) -> str:
-    return os.environ.get(name, default)

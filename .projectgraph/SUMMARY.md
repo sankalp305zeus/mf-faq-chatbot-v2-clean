@@ -13,12 +13,15 @@ Last generated: 2026-06-04 (updated after parser fix — build phase)
 - Chunking: one chunk per section per scheme; fund_management = one chunk per manager bio. No overlap at this scale.
 
 ## Architecture state
-Offline pipeline (fetch → parse → chunk → embed → ChromaDB) feeds online path (classify → resolve scheme → retrieve → constrained Groq generation → validate → format). Nine section tags, each with a dedicated structured builder pulling exact fields from mfServerSideData. All 5 schemes parse to 9/9 sections of complete answerable sentences. **Built through Phase 2:** 51 chunks (BGE-small-en-v1.5, 384-dim, cosine) persisted in ChromaDB collection 'mf_faq' at data/index/. Atomic pipeline: run.py chains fetch→parse→chunk→index in ~19s. Remaining: Phases 3–7.
+Offline pipeline (fetch → parse → chunk → embed → ChromaDB) feeds online path (classify → resolve scheme → retrieve → constrained Groq generation → validate → format). Nine section tags, each with a dedicated structured builder pulling exact fields from mfServerSideData. All 5 schemes parse to 9/9 sections of complete answerable sentences. **Built through Phase 3 + FAR fixes:** 51 chunks (BGE-small-en-v1.5, 384-dim, cosine) persisted in ChromaDB. Retrieval layer (app/retriever.py): two-stage — score-based scheme resolution (slug/alias/token-overlap) with competitor-AMC guard → two-pass ChromaDB query (guaranteed-section pass + semantic top-k pass, merged) → RetrievalResult dataclass (scheme_resolved, chunks, section_intent, source_url, supported_schemes, disambiguation_hint). 96 tests passing. Remaining: Phases 4–7.
 
 ## Known risks
 - mfServerSideData key path is Groww-internal and undocumented; key renames silently produce MissingRequiredField errors (detected, not silent)
 - One AMC description string truncated mid-word in Groww's payload (source data quality, not parser bug)
 - docs/ still empty (Phase 0 deliverable outstanding)
+- BGE model cold-start (~5–10 s) violates p95 < 5 s NFR on first request; warmup deferred to Phase 5 app/main.py startup hook (FAR-07)
+- Corpus is 5 Groww URLs vs 15–25 specified in Milestone RAG.docx; KIM/SID/AMFI/SEBI pages not yet ingested (FAR-08, Phase 8 backlog)
+- Scheme-level last_fetched_at metadata index not written by ingestion/index.py; chunk last_updated used as proxy (FAR-09, Phase 7)
 
 ## What didn't work
 - Substring keyword matching (v1): "ter" fired on "filter/later". Fixed by word-boundary regex.

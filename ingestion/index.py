@@ -25,10 +25,9 @@ from typing import Any
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-from ingestion.config import PROCESSED_DIR, ROOT, env
+from app.config import settings
+from ingestion.config import PROCESSED_DIR
 
-COLLECTION_NAME = "mf_faq"
-EMBED_MODEL_NAME = env("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 # BGE-small requires a query prefix for retrieval; documents are embedded plain.
 BGE_QUERY_PREFIX = "Represent this sentence for searching relevant passages: "
 
@@ -54,13 +53,15 @@ def load_all_chunks(processed_dir: Path = PROCESSED_DIR) -> list[dict]:
 def build_index(
     chunks: list[dict] | None = None,
     chroma_dir: Path | None = None,
-    model_name: str = EMBED_MODEL_NAME,
+    model_name: str | None = None,
 ) -> dict[str, Any]:
     """Embed chunks and upsert into ChromaDB. Returns a stats dict."""
     if chunks is None:
         chunks = load_all_chunks()
     if chroma_dir is None:
-        chroma_dir = ROOT / env("CHROMA_DIR", "data/index")
+        chroma_dir = settings.chroma_path
+    if model_name is None:
+        model_name = settings.embedding_model
 
     print(f"Loading embedding model: {model_name}")
     model = SentenceTransformer(model_name)
@@ -81,7 +82,7 @@ def build_index(
 
     # Get or create collection (cosine distance matches normalized embeddings).
     collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
+        name=settings.collection_name,
         metadata={"hnsw:space": "cosine"},
     )
 
@@ -97,7 +98,7 @@ def build_index(
         for c in chunks
     ]
 
-    print(f"Upserting {len(chunks)} chunks into collection '{COLLECTION_NAME}' …")
+    print(f"Upserting {len(chunks)} chunks into collection '{settings.collection_name}' …")
     collection.upsert(
         ids=ids,
         embeddings=embeddings.tolist(),
@@ -107,13 +108,13 @@ def build_index(
     # PersistentClient auto-persists on every write; no explicit flush needed.
 
     count = collection.count()
-    print(f"Collection '{COLLECTION_NAME}': {count} documents persisted.")
+    print(f"Collection '{settings.collection_name}': {count} documents persisted.")
 
     return {
         "model": model_name,
         "embedding_dim": embedding_dim,
         "chunks_embedded": len(chunks),
-        "collection": COLLECTION_NAME,
+        "collection": settings.collection_name,
         "collection_count": count,
         "chroma_dir": str(chroma_dir),
     }
