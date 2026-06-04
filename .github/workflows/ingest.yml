@@ -1,0 +1,71 @@
+name: Daily corpus ingestion
+
+on:
+  schedule:
+    # 10:00 AM IST = 04:30 UTC
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_fetch:
+        description: 'Skip HTTP fetch and re-index from cached HTML (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ingestion pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CHROMA_PATH: data/index
+          COLLECTION_NAME: mf_faq
+          LOG_LEVEL: INFO
+        run: |
+          if [ "${{ github.event.inputs.skip_fetch }}" = "true" ]; then
+            python -m ingestion.run --skip-fetch
+          else
+            python -m ingestion.run
+          fi
+
+      - name: Upload ChromaDB index as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chroma-index-${{ github.run_id }}
+          path: data/index/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Trigger Railway deployment
+        if: success()
+        env:
+          RAILWAY_DEPLOY_HOOK_URL: ${{ secrets.RAILWAY_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RAILWAY_DEPLOY_HOOK_URL" ]; then
+            echo "RAILWAY_DEPLOY_HOOK_URL secret not set — skipping Railway deploy trigger."
+            echo "Add this secret to enable automatic live deployment refresh."
+            exit 0
+          fi
+          echo "Ingestion succeeded. Triggering Railway deployment..."
+          http_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$RAILWAY_DEPLOY_HOOK_URL")
+          if [ "$http_status" = "200" ] || [ "$http_status" = "201" ] || [ "$http_status" = "202" ]; then
+            echo "Railway deployment triggered (HTTP $http_status)."
+            echo "Railway will now run: python -m ingestion.run (releaseCommand) then start the server."
+          else
+            echo "ERROR: Railway deploy hook returned HTTP $http_status. Check Railway dashboard."
+            exit 1
+          fi

@@ -1,0 +1,23 @@
+# Railway deployment configuration — MF FAQ Assistant (FastAPI backend)
+#
+# Bootstrap note: the releaseCommand seeds the ChromaDB index before the
+# server starts.  On first deploy this takes ~80s (BGE model download).
+# Subsequent deploys use cached model weights and take ~19s.
+#
+# Two services are required for a full deployment:
+#   1. api   — this file; FastAPI backend on PORT assigned by Railway
+#   2. ui    — streamlit run ui/streamlit_app.py (set API_BASE=<api URL>)
+# See docs/deployment-plan.md for step-by-step instructions.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Seed the ChromaDB index before the server accepts traffic.
+# GROQ_API_KEY must be set as a Railway environment variable.
+releaseCommand = "python -m ingestion.run"
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

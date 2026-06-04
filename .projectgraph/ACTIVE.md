@@ -1,21 +1,28 @@
 # Active
 
-Phase: pre-deploy review → Phase 7 build
-Agent: Forge (next)
+# Active
+
+Phase: Phase 7 — COMPLETE
+Agent: Forge (impl) · Sentinel (review — no FARs)
 Mode: ai-rag
 
 ## Objective
-Maya + Sentinel pre-deployment review complete (2026-06-04). Verdict: NO-GO for deployment, GO for Phase 7 build. Core RAG pipeline is solid (164 tests, 5-class classifier, citation enforcement, PII guard, Streamlit UI). Phase 7 is a complete zero — no scheduler, no CI workflow, no deployment config, no deployment plan doc. These are milestone exit-criteria blockers.
+Phase 7 complete (2026-06-04). All six critical findings (C1–C6) from the Maya + Sentinel pre-deployment review resolved. 164 tests pass. Project is deployment-ready pending live Railway deploy and live URL confirmation.
 
 ## Last handoff
-File: pre-deployment review (Maya + Sentinel), 2026-06-04.
-Critical findings: C1 — scheduler/daily.py not built, GitHub Actions absent, APScheduler commented out. C2 — no deployment artifacts (Dockerfile/Procfile/Railway config), no cold-start index bootstrap. C3 — README stale (describes no API/UI; Phases 3–7 shown as unbuilt). C4 — docs/ empty, deployment-plan.md missing. C5 — ARCHITECTURE.md + README describe UI as "Static HTML/JS / ui/index.html" but implementation is Streamlit / ui/streamlit_app.py.
+File: Phase 7 scheduler wiring fix, 2026-06-04.
+Deliverables: ingest.yml updated with Railway deploy hook step (POST RAILWAY_DEPLOY_HOOK_URL secret after ingestion succeeds; graceful skip if secret not set; non-zero exit if hook POST fails). docs/deployment-plan.md "Daily corpus refresh" section replaced with complete end-to-end path documentation, failure behaviour table, and deploy hook setup instructions. README deployment section updated with full pipeline diagram and two-secret requirement.
 
 ## Last decision
-Pre-deployment review classified all open work into three buckets: Critical Phase 7 (deployment blockers), Documentation Hygiene (can be done in same session), Future Backlog Phase 8 (corpus expansion, FAR-08, FAR-09). See NEXT.md for full Phase 7 task list and SUMMARY.md for all findings.
+GitHub Actions is the scheduler. The broken link (GH Actions built index in ephemeral runner but never updated Railway) is closed by adding a Railway deploy hook POST as the final workflow step, conditional on ingestion success. Railway's existing releaseCommand (python -m ingestion.run) handles the live index rebuild — no changes to railway.toml required. Sentinel review: no FARs.
 
 ## Blocker
-Phase 7 not started. No deployment artifacts exist.
+None. Remaining open items are Phase 8 backlog (FAR-08 corpus expansion, FAR-09 last_fetched_at, supported_schemes UX, CORS explicit config) — none block deployment.
 
 ## Next
-Phase 7 — execute in order: (1) fix README + ARCHITECTURE.md, (2) add /health endpoint, (3) scheduler/daily.py + APScheduler in requirements.txt, (4) .github/workflows/ingest.yml, (5) docs/deployment-plan.md, (6) Railway deploy + live URL, (7) update README with demo link + screenshot.
+Phase 8 backlog (optional):
+- FAR-08: Expand corpus to 15–25 URLs (KIM/SID/AMFI/SEBI)
+- FAR-09: Write scheme-level last_fetched_at to metadata index
+- Surface supported_schemes in UI on unresolved-scheme refusal
+- Explicit CORS config in app/main.py
+- Replace FETCH_USER_AGENT placeholder with live deployed URL

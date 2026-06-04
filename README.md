@@ -87,9 +87,9 @@ Built as part of the PM Club AI Engineering milestone.
 | Embeddings | `BGE-small-en-v1.5` (sentence-transformers) | Free, local, 384-dim; sufficient for 51 short factual chunks |
 | Vector store | `ChromaDB` (persistent) | Metadata filtering + upsert; FAISS lacks native filters |
 | LLM | `Groq` (Llama-3.x) | Fast inference; constrained system prompt + post-gen validator |
-| API | `FastAPI` | Single `POST /api/chat` endpoint *(Phase 5)* |
-| UI | Static HTML/JS | Minimal chat interface *(Phase 6)* |
-| Scheduler | `APScheduler` + GitHub Actions | Daily 10:00 AM IST corpus refresh *(Phase 7)* |
+| API | `FastAPI` + `uvicorn` | Single `POST /api/chat` + `GET /health` endpoints |
+| UI | `Streamlit` (`ui/streamlit_app.py`) | Dark-theme three-column chat interface with history and fund details panel |
+| Scheduler | `APScheduler` + GitHub Actions | Daily 10:00 AM IST corpus refresh |
 | Language | Python 3.9+ | — |
 
 ---
@@ -105,19 +105,47 @@ python3 -m pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env — add GROQ_API_KEY (required for Phase 4+)
-
-# Run the ingestion pipeline (fetch → parse → chunk → embed → index)
-python3 -m ingestion.run
-
-# Or re-index without re-fetching (uses cached HTML)
-python3 -m ingestion.run --skip-fetch
-
-# Run tests
-python3 -m pytest tests/ -q
+# Edit .env — add GROQ_API_KEY (required for generation)
 ```
 
-The pipeline takes ~19s on a warm model cache (~80s on first run while BGE downloads).
+### 1. Build the index
+
+```bash
+# Full pipeline: fetch → parse → chunk → embed → index (~80s first run; ~19s after BGE is cached)
+python3 -m ingestion.run
+
+# Re-index from cached HTML without re-fetching
+python3 -m ingestion.run --skip-fetch
+```
+
+### 2. Run the API
+
+```bash
+uvicorn app.main:app --reload --port 8000
+# Health check: curl http://localhost:8000/health
+```
+
+### 3. Run the UI
+
+```bash
+# In a separate terminal (API must be running)
+streamlit run ui/streamlit_app.py
+# Opens at http://localhost:8501
+```
+
+### 4. Run tests
+
+```bash
+python3 -m pytest tests/ -q
+# 164 pass, 20 skipped (integration tests that require live Groq)
+```
+
+### 5. Run the daily scheduler (optional — for local development)
+
+```bash
+python3 -m scheduler.daily
+# Triggers ingestion.run at 10:00 AM IST every day
+```
 
 ---
 
@@ -128,13 +156,15 @@ The pipeline takes ~19s on a warm model cache (~80s on first run while BGE downl
 | 0 | Repo scaffold, config, deps | ✅ Done |
 | 1 | Fetch → parse → section extraction → chunking | ✅ Done |
 | 2 | BGE embeddings → ChromaDB index | ✅ Done |
-| 3 | Two-stage retriever (scheme filter + semantic) | ⬜ Next |
-| 4 | Groq generation + output validator | ⬜ Planned |
-| 5 | FastAPI endpoint + query classifier + compliance | ⬜ Planned |
-| 6 | Minimal chat UI | ⬜ Planned |
-| 7 | Daily scheduler + deployment | ⬜ Planned |
+| 3 | Two-stage retriever (scheme filter + semantic) | ✅ Done |
+| 4 | Groq generation + output validator | ✅ Done |
+| 5 | FastAPI endpoint + query classifier + compliance | ✅ Done |
+| 6 | Streamlit chat UI | ✅ Done |
+| 7 | Daily scheduler + deployment | ✅ Done |
 
-**What works today:** the full offline pipeline. Run `python3 -m ingestion.run` and the vector store is built with 51 chunks across 9 sections for all 5 schemes. Retrieval via ChromaDB is functional; the online API and UI are not yet built.
+**164 tests pass** (42 classifier, 43 generation, 68 retrieval, 11 other). 20 skipped (live Groq integration tests).
+
+**What works end-to-end:** factual queries are answered with a grounded ≤3-sentence response and one allowlisted citation. Advisory, comparison, performance, and out-of-scope queries are refused with a static AMFI/SEBI link. PII is rejected before reaching the retrieval or generation layers. The full pipeline — index build, API, and UI — runs locally with a single `GROQ_API_KEY`.
 
 ---
 
@@ -156,9 +186,19 @@ mf-faq-chatbot-v2/
 │   ├── chunk.py             # Section-aware chunker → data/processed/
 │   ├── index.py             # BGE embed + ChromaDB upsert
 │   └── run.py               # Atomic pipeline entrypoint
-├── app/                     # Online API layer (Phases 3–5, not yet built)
-├── scheduler/               # Daily trigger (Phase 7, not yet built)
-├── ui/                      # Chat interface (Phase 6, not yet built)
+├── app/
+│   ├── main.py              # FastAPI: POST /api/chat, GET /health, PII guard, rate limit
+│   ├── classifier.py        # 5-class query classifier (factual/advisory/comparison/perf/oos)
+│   ├── retriever.py         # Two-stage ChromaDB retrieval (scheme filter + semantic top-k)
+│   ├── generator.py         # Groq generation with constrained system prompt + fallback
+│   ├── validator.py         # Post-gen checks: sentence count, citation allowlist, grounding
+│   └── formatter.py         # JSON response builder; suppresses footer on empty last_updated
+├── scheduler/
+│   └── daily.py             # APScheduler: triggers ingestion at 10:00 AM IST
+├── ui/
+│   └── streamlit_app.py     # Dark-theme chat UI: 3-column layout, history, fund details panel
+├── .github/workflows/
+│   └── ingest.yml           # GitHub Actions: daily cron at 04:30 UTC (10:00 AM IST)
 ├── tests/
 │   ├── test_sections.py     # 18 structured extractor tests
 │   └── test_chunk.py        # 10 chunker tests
@@ -167,6 +207,29 @@ mf-faq-chatbot-v2/
 ├── .env.example
 └── requirements.txt
 ```
+
+---
+
+## Deployment
+
+The application deploys to Railway as two services (API + UI). See [`docs/deployment-plan.md`](docs/deployment-plan.md) for the full step-by-step guide.
+
+**Quick reference:**
+
+| Service | Start command | Key env var |
+|---------|--------------|-------------|
+| API | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` | `GROQ_API_KEY` |
+| UI | `streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0` | `API_BASE=<api-url>` |
+
+The `railway.toml` `releaseCommand` runs `python -m ingestion.run` on every deploy, seeding the ChromaDB index before the server starts. Daily re-ingestion is fully automated:
+
+```
+GitHub Actions cron (04:30 UTC = 10:00 AM IST)
+  → ingestion succeeds → POST RAILWAY_DEPLOY_HOOK_URL
+  → Railway releaseCommand rebuilds index → new deployment goes live
+```
+
+Two repository secrets are required: `GROQ_API_KEY` and `RAILWAY_DEPLOY_HOOK_URL` (Railway dashboard → API service → Settings → Deploy Hooks). See [`docs/deployment-plan.md`](docs/deployment-plan.md) for full setup instructions.
 
 ---
 

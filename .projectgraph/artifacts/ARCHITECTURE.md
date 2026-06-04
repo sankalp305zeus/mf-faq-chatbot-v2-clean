@@ -27,7 +27,7 @@ Layer 1 — Offline ingest  ingestion/ + scheduler/   (fetch→parse→chunk→e
 
 | Layer | Module | Responsibility |
 |-------|--------|----------------|
-| 5 | `ui/index.html` | Minimal chat UI, disclaimer, 3 examples, render citation+footer, no PII prompts |
+| 5 | `ui/streamlit_app.py` | Dark-theme Streamlit chat UI; disclaimer chip, 3 example buttons, chat history, fund details panel, citation+footer rendering, no PII prompts |
 | 4 | `app/main.py` | `POST /api/chat`; orchestrate classify → route → respond |
 | 4 | `app/classifier.py` | Label query: factual / advisory / comparison / performance / out-of-scope |
 | 4 | `app/retriever.py` | Two-stage retrieval over ChromaDB |
@@ -41,7 +41,8 @@ Layer 1 — Offline ingest  ingestion/ + scheduler/   (fetch→parse→chunk→e
 | 1 | `ingestion/chunk.py` | Section-aware chunking |
 | 1 | `ingestion/index.py` | Embed (BGE) + upsert Chroma + refresh metadata |
 | 1 | `ingestion/run.py` | Atomic ingestion entrypoint |
-| 1 | `scheduler/daily.py` | Trigger run.py at 10:00 AM IST |
+| 1 | `scheduler/daily.py` | APScheduler: trigger run.py at 10:00 AM IST (in-process) |
+| 1 | `.github/workflows/ingest.yml` | GitHub Actions cron: trigger run.py at 04:30 UTC = 10:00 AM IST |
 
 ---
 
@@ -121,7 +122,7 @@ scheduler → run.py → fetch 5 URLs → parse → section-extract → chunk
 | Ingestion | requests/BeautifulSoup (Playwright if JS-rendered) | Parse Groww pages |
 | Scheduler | APScheduler/cron (local) + GitHub Actions (repo) | 10:00 AM IST daily |
 | Classifier | Rules first, LLM fallback for ambiguous | Simplicity + accuracy |
-| UI | Static HTML/JS (Stitch-styled) | Minimal, fast to ship |
+| UI | Streamlit (`ui/streamlit_app.py`) | Dark-theme three-column layout; chat history; fund details panel |
 | Config | Env vars + `config/corpus.yaml` | No secrets in repo |
 
 ---

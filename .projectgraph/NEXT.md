@@ -3,7 +3,19 @@
 Phase 7 — Scheduler + Deployment
 Generated: 2026-06-04 (post Maya + Sentinel pre-deployment review)
 
-## Critical Phase 7 work (ordered — must complete all to hit exit criteria)
+## Phase 7 status: COMPLETE (2026-06-04, scheduler wiring confirmed closed)
+
+All 10 critical tasks delivered. Sentinel final review: no FARs.
+
+---
+
+## Phase 8 backlog (future — does not block deployment)
+
+See items below. Former "Critical Phase 7 work" section preserved for record.
+
+---
+
+## Critical Phase 7 work — COMPLETED (ordered — must complete all to hit exit criteria)
 
 1. **Fix README** — update current-status table (Phases 3–6 ✅), rewrite "What works today" section, add "Running the API" (`uvicorn app.main:app --reload`) and "Running the UI" (`streamlit run ui/streamlit_app.py`) sections.
 2. **Fix ARCHITECTURE.md + README tech-stack table** — change UI layer from "Static HTML/JS (`ui/index.html`)" to "Streamlit (`ui/streamlit_app.py`)" in both documents.
