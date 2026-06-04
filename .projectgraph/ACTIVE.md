@@ -1,21 +1,21 @@
 # Active
 
-Phase: build
-Agent: Forge
+Phase: pre-deploy review → Phase 7 build
+Agent: Forge (next)
 Mode: ai-rag
 
 ## Objective
-Phase 5 + Phase 6 complete. 164 tests pass (42 classifier, 43 generation, 68 retrieval, 11 other). End-to-end: factual queries answered with Groq + citation + footer; advisory/comparison/performance/PII/unresolved-scheme all refused correctly. Streamlit UI wired to FastAPI. Full multi-agent workflow: Maya (scope), Atlas (arch), Forge (impl), Sentinel (review — no FARs).
+Maya + Sentinel pre-deployment review complete (2026-06-04). Verdict: NO-GO for deployment, GO for Phase 7 build. Core RAG pipeline is solid (164 tests, 5-class classifier, citation enforcement, PII guard, Streamlit UI). Phase 7 is a complete zero — no scheduler, no CI workflow, no deployment config, no deployment plan doc. These are milestone exit-criteria blockers.
 
 ## Last handoff
-File: journal/2026-06-04-build-forge-p4.md (P4 reference)
-Summary: Phase 5 — app/classifier.py (5-class rules-based, comparison > advisory > performance priority), app/formatter.py (footer suppression on empty last_updated), app/main.py (FastAPI, lifespan BGE warmup, PII guard, slowapi rate limit, structured logging). app/retriever.py warmup() added (FAR-07 resolved). Phase 6 — ui/streamlit_app.py (disclaimer banner, 3 example buttons, answer/refusal/citation rendering, API_BASE env var). groq upgraded to >=0.13.0 to fix httpx 0.28.x proxies kwarg incompatibility.
+File: pre-deployment review (Maya + Sentinel), 2026-06-04.
+Critical findings: C1 — scheduler/daily.py not built, GitHub Actions absent, APScheduler commented out. C2 — no deployment artifacts (Dockerfile/Procfile/Railway config), no cold-start index bootstrap. C3 — README stale (describes no API/UI; Phases 3–7 shown as unbuilt). C4 — docs/ empty, deployment-plan.md missing. C5 — ARCHITECTURE.md + README describe UI as "Static HTML/JS / ui/index.html" but implementation is Streamlit / ui/streamlit_app.py.
 
 ## Last decision
-Classifier priority: comparison checked before advisory so "which is better" routes to comparison not advisory. Both are refusals — outcome identical. Slowapi + FastAPI body-parsing conflict resolved by reading body via request.json() instead of Pydantic injection parameter.
+Pre-deployment review classified all open work into three buckets: Critical Phase 7 (deployment blockers), Documentation Hygiene (can be done in same session), Future Backlog Phase 8 (corpus expansion, FAR-08, FAR-09). See NEXT.md for full Phase 7 task list and SUMMARY.md for all findings.
 
 ## Blocker
-None.
+Phase 7 not started. No deployment artifacts exist.
 
 ## Next
-Phase 7 — scheduler/daily.py (APScheduler, 10:00 AM IST), GitHub Actions ingest.yml, Railway deployment, docs/deployment-plan.md, README.
+Phase 7 — execute in order: (1) fix README + ARCHITECTURE.md, (2) add /health endpoint, (3) scheduler/daily.py + APScheduler in requirements.txt, (4) .github/workflows/ingest.yml, (5) docs/deployment-plan.md, (6) Railway deploy + live URL, (7) update README with demo link + screenshot.

@@ -18,10 +18,38 @@ Offline pipeline (fetch → parse → chunk → embed → ChromaDB) feeds online
 ## Known risks
 - mfServerSideData key path is Groww-internal and undocumented; key renames silently produce MissingRequiredField errors (detected, not silent)
 - One AMC description string truncated mid-word in Groww's payload (source data quality, not parser bug)
-- docs/ still empty (Phase 0 deliverable outstanding)
+- docs/ still empty (Phase 0 deliverable outstanding — blocker for Phase 7 exit)
 - BGE model cold-start resolved via warmup() in app/main.py lifespan startup (FAR-07 closed)
 - Corpus is 5 Groww URLs vs 15–25 specified in Milestone RAG.docx; KIM/SID/AMFI/SEBI pages not yet ingested (FAR-08, Phase 8 backlog)
-- Scheme-level last_fetched_at metadata index not written by ingestion/index.py; chunk last_updated used as proxy (FAR-09, Phase 7)
+- Scheme-level last_fetched_at metadata index not written by ingestion/index.py; chunk last_updated used as proxy (FAR-09, Phase 8 backlog)
+- Groww ToS not addressed anywhere in project; scraping mfServerSideData is undocumented behaviour (legal/reputational surface for portfolio demo — should carry explicit disclaimer)
+- data/index/ is gitignored; fresh deploy has no index; cold-start bootstrap must run ingestion.run before first query — not yet documented or automated
+- Rate limit inconsistency: .env.example sets RATE_LIMIT=30/minute; ACTIVE.md/code notes say 20/minute; source of truth is app/config.py (verify before deploy)
+- FETCH_USER_AGENT in .env.example still contains placeholder URL (https://example.com) — must be replaced with real deployed URL before production scraping
+
+## Pre-deployment review findings (2026-06-04, Maya + Sentinel)
+
+### Critical Phase 7 blockers (C1–C6)
+- C1: scheduler/daily.py not built; .github/ directory absent (no ingest.yml); APScheduler commented out in requirements.txt
+- C2: No deployment artifacts — no Dockerfile, Procfile, railway.toml, or equivalent; no cold-start index bootstrap step documented or automated
+- C3: README stale — current-status table shows Phases 3–7 as unbuilt; "What works today" section says "the online API and UI are not yet built" (both now exist)
+- C4: docs/ is empty; docs/deployment-plan.md missing (Phase 7 deliverable)
+- C5: ARCHITECTURE.md and README both describe UI layer as "Static HTML/JS (ui/index.html)" — actual implementation is Streamlit (ui/streamlit_app.py); architecture document not updated after UI technology changed
+- C6: No /health endpoint in FastAPI; Railway and uptime monitors require one
+
+### Documentation hygiene (non-blocking, same session)
+- README missing "Running the API" and "Running the UI" sections (uvicorn + streamlit commands)
+- README missing demo screenshot
+- README corpus table uses bare URLs without https:// prefix
+- ARCHITECTURE.md technology table wrong for UI layer (see C5)
+- Rate limit value should be reconciled and documented (see Known risks)
+- FETCH_USER_AGENT placeholder must be replaced (see Known risks)
+- Milestone RAG.docx committed to repo root (binary file, cannot diff; consider moving to docs/)
+
+### UX gaps identified by Maya
+- Unresolved-scheme refusals: retriever returns supported_schemes but Streamlit UI does not surface them to the user; user gets refused with no guidance on which 5 schemes are supported
+- No error state rendering documented for API timeout or Groq outage in ui/streamlit_app.py
+- last_updated footer shows chunk fetch date, not scheme last_fetched_at (FAR-09 open; user may see stale date)
 
 ## What didn't work
 - Substring keyword matching (v1): "ter" fired on "filter/later". Fixed by word-boundary regex.
