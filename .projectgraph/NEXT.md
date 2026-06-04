@@ -3,6 +3,19 @@
 Phase 7 — Scheduler + Deployment
 Generated: 2026-06-04 (post Maya + Sentinel pre-deployment review)
 
+## Production incident status: ACTIVE (2026-06-05) — deployment frozen
+
+### Immediate next action (no code, no deploy)
+Open Railway dashboard → click mf-faq-chatbot-v2-clean service → Deploy Logs tab → read startup lines of the active deployment.
+
+Expected outcome A: Streamlit startup messages → both services running Streamlit → fix is Railway dashboard per-service start command override for mf-faq-chatbot-v2-clean: "python -m ingestion.run && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
+Expected outcome B: uvicorn/FastAPI startup messages → root cause is elsewhere → inspect HTTP logs for mf-faq-chatbot-v2-clean
+
+See INVESTIGATION_LEDGER.md, DEPLOYMENT_HANDOFF.md, DEPLOYMENT_POSTURE.md for full context.
+
+---
+
 ## Phase 7 status: COMPLETE (2026-06-04, scheduler wiring confirmed closed)
 
 All 10 critical tasks delivered. Sentinel final review: no FARs.

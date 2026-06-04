@@ -1,6 +1,6 @@
 # Summary
 
-Last generated: 2026-06-04 (updated after parser fix — build phase)
+Last generated: 2026-06-05 (production incident checkpoint)
 
 ## Key decisions
 - Mode = ai-rag; compliance-first, accuracy over intelligence
@@ -14,6 +14,10 @@ Last generated: 2026-06-04 (updated after parser fix — build phase)
 
 ## Architecture state
 Offline pipeline (fetch → parse → chunk → embed → ChromaDB) feeds online path (classify → resolve scheme → retrieve → constrained Groq generation → validate → format). Nine section tags, each with a dedicated structured builder pulling exact fields from mfServerSideData. All 5 schemes parse to 9/9 sections of complete answerable sentences. **Built through Phase 7 + Sentinel reviews (no FARs):** 51 chunks indexed in ChromaDB. API layer (app/main.py): FastAPI, POST /api/chat, GET /health, lifespan BGE warmup (FAR-07 resolved), PII guard (PAN/Aadhaar/mobile/email), slowapi per-IP rate limit (30/minute default), structured logging (no PII), CORS middleware (allow all origins). Classifier (app/classifier.py): 5-class rules-based (factual/advisory/comparison/performance/out_of_scope), comparison checked before advisory. Formatter (app/formatter.py): footer suppression when last_updated empty. UI (ui/streamlit_app.py): Streamlit dark-theme, 3-column layout, chat history, fund details panel, disclaimer chip, 3 example buttons, answer/refusal/citation rendering, API_BASE env var. groq pinned to >=0.13.0 (httpx 0.28.x compatibility). Scheduler (scheduler/daily.py): APScheduler BlockingScheduler, CronTrigger 10:00 AM IST (local/dev use). GitHub Actions (.github/workflows/ingest.yml): cron 04:30 UTC daily + workflow_dispatch; on ingestion success POSTs RAILWAY_DEPLOY_HOOK_URL secret to trigger live Railway deployment (graceful skip if secret not set). Deployment config (railway.toml): releaseCommand = python -m ingestion.run seeds ChromaDB index on every Railway deploy, healthcheckPath /health, 300s timeout. End-to-end refresh path: GH Actions cron → ingestion → deploy hook → Railway releaseCommand → live index rebuilt → new deployment serves fresh data. 164 tests passing (20 skipped = integration). All phases complete.
+
+## Production incident (2026-06-05) — active
+
+POST /api/chat returns 403 Client Error from http://mf-faq-chatbot-v2-clean.railway.internal:8080/api/chat. Streamlit UI is live but non-functional for chat. Primary hypothesis: both Railway services are running Streamlit because railway.toml startCommand was changed to "streamlit run ..." (commit 21a68ba) and both services deploy from the same railway.toml. The mf-faq-chatbot-v2-clean (API) service may be running Streamlit's HTTP server, which returns 403 for POST requests to /api/chat. Root cause unconfirmed — next test: inspect Deploy Logs for mf-faq-chatbot-v2-clean. Handoff package created: DEPLOYMENT_HANDOFF.md, INVESTIGATION_LEDGER.md, DEPLOYMENT_POSTURE.md.
 
 ## Known risks
 - mfServerSideData key path is Groww-internal and undocumented; key renames silently produce MissingRequiredField errors (detected, not silent)
