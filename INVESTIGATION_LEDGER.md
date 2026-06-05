@@ -2,7 +2,7 @@
 
 **Incident:** HTTP 403 on `POST /api/chat` from Streamlit frontend to FastAPI backend  
 **Opened:** 2026-06-05  
-**Status:** Fix committed and pushed. Two Railway dashboard actions remaining before production is operational. See DEPLOYMENT_HANDOFF.md operator checklist.
+**Status:** Backend operational. Frontend regression confirmed — one Railway dashboard action remaining. See PROJECT_CLOSURE_REPORT.md for full audit.
 
 ---
 
@@ -208,15 +208,23 @@
 ---
 
 **UNKNOWN-004**  
-**Description:** What does `GET http://mf-faq-chatbot-v2-clean.railway.internal:8080/health` return — `{"status":"ok"}` (FastAPI) or HTML/403 (Streamlit)?  
-**Status:** Unresolved — not yet tested. Lower priority now that root cause is confirmed; no longer needed to confirm root cause, only to verify fix after implementation.  
+**Description:** What does `GET http://mf-faq-chatbot-v2-clean.railway.internal:8080/health` return?  
+**Status:** **RESOLVED** — Public URL equivalent confirmed: `GET https://mf-faq-chatbot-v2-clean-production.up.railway.app/health` returns `{"status":"ok"}`. FastAPI is running on the API service.  
 **Last Updated:** 2026-06-05
 
 ---
 
 **UNKNOWN-005**  
 **Description:** What environment variables are currently set on the `mf-faq-chatbot-v2-clean` service?  
-**Status:** Unresolved — still unknown. Required before any fix is deployed (must confirm `GROQ_API_KEY`, `CHROMA_PATH`, `COLLECTION_NAME` are present on the API service, not just the frontend service).  
+**Status:** Functionally resolved — API service returns correct Groq-generated answers, proving GROQ_API_KEY is present and valid. Exact variable list still unverified without RAILWAY_API_TOKEN.  
+**Last Updated:** 2026-06-05
+
+---
+
+**UNKNOWN-006**  
+**Description:** Is `adventurous-inspiration` running Streamlit or uvicorn after the git push?  
+**Status:** **CONFIRMED REGRESSION** — `GET https://adventurous-inspiration-production-7f7f.up.railway.app/health` returns `{"status":"ok"}` (FastAPI). The git push auto-redeployed the frontend with the restored `railway.toml` (uvicorn command). The Railway Config File override to `/railway.ui.toml` was never applied in the dashboard.  
+**Resolution:** Railway dashboard → `adventurous-inspiration` → Settings → Railway Config File → `/railway.ui.toml` → Save.  
 **Last Updated:** 2026-06-05
 
 ---
