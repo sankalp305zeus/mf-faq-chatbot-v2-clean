@@ -99,12 +99,21 @@ def check_advisory(text: str) -> list[str]:
 
 
 def check_grounding(answer: str, chunks: list[dict]) -> list[str]:
-    """Return numbers found in answer but absent from all chunk texts."""
+    """Return numbers found in answer but absent from all chunk texts.
+
+    Chunk text is normalised before comparison to handle the unit alias
+    'Cr' (abbreviation used by Groww) vs 'crore' (expanded form used by
+    the LLM).  Only the comparison string is modified — answer text,
+    chunk data, and all outputs are untouched.
+    """
     all_chunk_text = " ".join(c.get("text", "") for c in chunks)
+    # Normalise unit alias: 'Cr' (Groww abbreviation) → 'crore' (LLM output form).
+    # Applied to chunk text only, inside this function, for comparison purposes.
+    chunk_text_normalised = re.sub(r"\bCr\b", "crore", all_chunk_text)
     ungrounded = []
     for num in _NUMBER_RE.findall(answer):
         num_clean = num.strip()
-        if num_clean and num_clean not in all_chunk_text:
+        if num_clean and num_clean not in chunk_text_normalised:
             ungrounded.append(num_clean)
     return ungrounded
 

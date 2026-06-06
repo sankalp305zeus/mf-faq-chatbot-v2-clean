@@ -28,6 +28,73 @@ scheme resolution: hdfc-mid-cap, hdfc-small-cap confirmed resolving in live logs
 Known:
 AUM query triggers grounding_failure in validator — link-only fallback returned
 Pre-existing validator behaviour, not related to this fix
+→ Fixed in Bug-002 below
+
+---
+
+# Bug-002
+
+Date: 2026-06-07
+Bug: AUM query returns "unable to generate" on all 5 schemes
+
+Root Cause:
+Groww chunks store total assets as ₹2,70,046 Cr (abbreviation).
+LLM naturally expands Cr → crore in its answer.
+Validator's literal substring check: "2,70,046 crore" not in chunk text.
+Grounding failure triggered → link-only fallback every time.
+
+Fix:
+Normalise chunk text before comparison only.
+re.sub(r"\bCr\b", "crore", all_chunk_text) inside check_grounding().
+Answer text, corpus, retrieval, generation — untouched.
+
+Verification:
+4/4 tests passed
+  ✅ AUM query — previously failing, now grounded
+  ✅ Expense ratio — unchanged behaviour
+  ✅ Fund manager — unchanged behaviour
+  ✅ Hallucination — fake ₹1,23,456.99 crore still caught
+
+File changed: app/validator.py only
+Lines changed: 2 operational, 6 comments/docstring
+
+Pending:
+Commit and push approval
+Railway redeploy
+
+---
+
+## Diff — Bug-002
+
+```diff
+diff --git a/app/validator.py b/app/validator.py
+index 5ccf225..ac35fbf 100644
+--- a/app/validator.py
++++ b/app/validator.py
+@@ -99,12 +99,21 @@ def check_advisory(text: str) -> list[str]:
+ 
+ 
+ def check_grounding(answer: str, chunks: list[dict]) -> list[str]:
+-    """Return numbers found in answer but absent from all chunk texts."""
++    """Return numbers found in answer but absent from all chunk texts.
++
++    Chunk text is normalised before comparison to handle the unit alias
++    'Cr' (abbreviation used by Groww) vs 'crore' (expanded form used by
++    the LLM).  Only the comparison string is modified — answer text,
++    chunk data, and all outputs are untouched.
++    """
+     all_chunk_text = " ".join(c.get("text", "") for c in chunks)
++    # Normalise unit alias: 'Cr' (Groww abbreviation) → 'crore' (LLM output form).
++    # Applied to chunk text only, inside this function, for comparison purposes.
++    chunk_text_normalised = re.sub(r"\bCr\b", "crore", all_chunk_text)
+     ungrounded = []
+     for num in _NUMBER_RE.findall(answer):
+         num_clean = num.strip()
+-        if num_clean and num_clean not in all_chunk_text:
++        if num_clean and num_clean not in chunk_text_normalised:
+             ungrounded.append(num_clean)
+     return ungrounded
+```
 
 ---
 
