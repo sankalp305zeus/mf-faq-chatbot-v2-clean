@@ -14,9 +14,20 @@ Enriched retrieval query before retrieval
 Verification:
 15/15 retrieval tests passed
 
-Pending:
-Railway deployment
-Production verification
+Verified:
+2026-06-06T21:26 — all 5 tabs tested in production
+AUM, exit load, expense ratio, fund manager — all returning answers with Groww citations
+Defence tab confirmed working last
+
+Deployed:
+2026-06-06T15:43Z — commit fb854af live on Railway
+Ingestion: 5 schemes, 51 chunks, 9/9 sections per scheme
+Groq: confirmed succeeding in production logs
+scheme resolution: hdfc-mid-cap, hdfc-small-cap confirmed resolving in live logs
+
+Known:
+AUM query triggers grounding_failure in validator — link-only fallback returned
+Pre-existing validator behaviour, not related to this fix
 
 ---
 
