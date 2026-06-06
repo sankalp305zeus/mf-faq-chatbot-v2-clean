@@ -58,9 +58,33 @@ Verification:
 File changed: app/validator.py only
 Lines changed: 2 operational, 6 comments/docstring
 
-Pending:
-Commit and push approval
-Railway redeploy
+Deployed:
+2026-06-07 — commit d6c066f live on Railway
+Production verified — AUM now returning answers on all 5 schemes
+
+MVP Status: COMPLETE AND VERIFIED
+
+Features verified in production:
+  ✅ Scheme context routing (5 tabs)
+  ✅ Fund manager retrieval
+  ✅ Expense ratio retrieval
+  ✅ Exit load retrieval
+  ✅ AUM retrieval
+  ✅ Grounding validator (hallucination protection intact)
+  ✅ Refusal behaviour (advisory / comparison / performance)
+  ✅ Source citations (Groww URLs on every answer)
+
+Known limitations:
+  - Evaluation dataset (24 questions) not yet built
+  - RAILWAY_DEPLOY_HOOK_URL in GitHub Secrets not confirmed
+  - Rate limit is per-IP (Railway proxy shares IP across users)
+  - 5 HDFC schemes only — no multi-AMC support
+
+Next roadmap:
+  1. Confirm RAILWAY_DEPLOY_HOOK_URL for automated daily refresh
+  2. Build evaluation dataset — 24 questions, precision + groundedness scoring
+  3. Expand to additional schemes and AMCs
+  4. Add N8N operational automation (health monitoring, error alerting, feedback capture)
 
 ---
 
